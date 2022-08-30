@@ -1,42 +1,57 @@
 import os
 import cv2
-from multiprocessing import Process, Queue, Value, Lock
+from threading import Thread
+from multiprocessing import Queue, Value, Lock
 
-import face_recognition
+# from utils import face_recognition
 
 
-def predict_face():
-    pass
+def show(result_queue, mp_running):
+    """
+    Show resultq
+    """
+    while mp_running.value:
+        if not result_queue.empty():
+            img = result_queue.get()
 
-def draw_face():
-    pass
+            cv2.imshow("Face Gender Classification!", img)
+            key = cv2.waitKey(1)
+            if key & 0xFF == ord('q'):
+                mp_running.value = 0
+                break
+    cv2.destroyAllWindows()
 
-def get_face():
-    pass
-
-def show():
+def capture(frame_queue, mp_running):
+    """
+    """
     cam = cv2.VideoCapture(0)
-
-    while True:
+    while mp_running.value:
         ret, frame = cam.read()
         if ret:
-            cv2.imshow('Face Gender Classification', frame)
+            if frame_queue.empty():
+                frame_queue.put(frame)
 
-            key = cv2.waitKey(25)    
-            if key == ord('q'):
-                break
-        else:
-            print("Can not caputre from this camera!")
-            break
-    
-    cv2.destroyAllWindows()
 
 def main():
     input_queue  = Queue(maxsize=1024)
     face_queue   = Queue(maxsize=1024)
     output_queue = Queue(maxsize=1024)
     
-    show()
+    mp_running = Value('i', 1)
+
+    captureThread = Thread(target=capture, args=(input_queue, mp_running), daemon=True)
+    captureThread.start()
+    showThread = Thread(target=show, args=(input_queue, mp_running), daemon=True)
+    showThread.start()
+    
+    while mp_running.value:
+        continue
+    
+    while not input_queue.empty():
+        _ = input_queue.get()
+
+    captureThread.join()
+    showThread.join()
 
 
 
